@@ -6,6 +6,7 @@
 
 import os
 import ahocorasick
+import re
 
 class QuestionClassifier:
     def __init__(self):
@@ -29,16 +30,19 @@ class QuestionClassifier:
         self.wdtype_dict = self.build_wdtype_dict()
 
         # 问句疑问词
-        self.symptom_qwds = ['症状', '表征', '现象', '症候', '表现']
-        self.acompany_qwds = ['并发症', '并发', '一起发生', '一并发生', '一起出现', '一并出现', '一同发生', '一同出现', '伴随发生', '伴随', '共现', '还']
-        self.belong_qwds = ['属于什么科', '属于', '去', '挂', '什么科', '科室', '诊室', '挂什么科', '什么科室', '去什么科室','去什么科', '挂什么号', '挂号']
+        #self.symptom_qwds = ['症状', '表征', '现象', '症候', '表现']
+        #self.acompany_qwds = ['并发症', '并发', '一起发生', '一并发生', '一起出现', '一并出现', '一同发生', '一同出现', '伴随发生', '伴随', '共现', '还']
+        #self.belong_qwds = ['属于什么科', '属于', '去', '挂', '什么科', '科室', '诊室', '挂什么科', '什么科室', '去什么科室','去什么科', '挂什么号', '挂号']
+        self.doubt_qwds = ['有没有可能', '是不是', '会不会', '会不会是', '也许', '大概', '可能']
+        self.female = ['女', '女性', '女孩', '女童', '女婴', '妇女', '孕妇', '产妇', 'woman', 'women', 'female', 'f', 'F']
+        self.male = ['男', '男性', '男孩', '男童', '男婴', 'man', 'men', 'male', 'm', 'M']
 
-        print('model init finished ......')
+        #print('model init finished ......')
 
         return
 
     '''分类主函数'''    #我的项目只有两种1."symptom_department" 2."disease_department" 1需要借助2完成
-    def classify(self, question):
+    def classify(self, age, sex, question):
         data = {}
         medical_dict = self.check_medical(question)
         if not medical_dict:
@@ -48,7 +52,7 @@ class QuestionClassifier:
         types = []
         for type_ in medical_dict.values():
             types += type_
-        question_type = 'others'
+        #question_type = 'others'
 
         question_types = []
 
@@ -75,14 +79,32 @@ class QuestionClassifier:
         if question_types == [] and 'symptom' in types:
             question_types = ['symptom_disease']'''
         
-        if ('symptom' in types):
-            question_types = ['symptom_department']
-            
-        if ('disease' in types):
-            question_types = ['disease_department']
-
-        if question_types == []:
-            question_types.append(question_type)
+        if ('disease' in types) and not (self.check_words(self.doubt_qwds, question)): #基本不存在
+            question_types.append('specific_dis')
+        else:
+            if self.group_age(age) == 'infant': #TODO: 具体看数据细分到什么程度，需要疾病还是直接分到一个诊室
+                question_types.append('infant')
+            elif self.group_age(age) == 'child': #TODO: 具体看数据细分到什么程度，需要疾病还是直接分到一个诊室
+                if 'disease' in types:
+                    question_types.append('child_dis')
+                if 'symptom' in types:
+                    question_types.append('child_sym')
+            else:
+                if self.check_words(self.female, sex):
+                    if 'disease' in types:
+                        question_types.append('female_dis')
+                    if 'symptom' in types:
+                        question_types.append('female_sym')
+                elif self.check_words(self.male, sex):
+                    if 'disease' in types:
+                        question_types.append('male_dis')
+                    if 'symptom' in types:
+                        question_types.append('male_sym')
+                else:
+                    if 'disease' in types:
+                        question_types.append('dis')
+                    if 'symptom' in types:
+                        question_types.append('sym')
             
         # 将多个分类结果进行合并处理，组装成一个字典
         data['question_types'] = question_types
@@ -132,6 +154,25 @@ class QuestionClassifier:
             if wd in sent:
                 return True
         return False
+    
+    '''对年龄进行分类：0~1岁：infant；1~14岁：child；15岁及以上：adult'''
+    def group_age(self, age):
+        age_dic = {}
+        quants = [i for i in age if not(str.isdigit(i))] #e.g. 天，周，月，岁
+        if not(quants):
+            age_dic['岁'] = int(age)
+        else:
+            ages = []
+            ages = re.findall("\d+\.?\d*", age)  # 正则表达式
+            for i in range(len(quants)):
+                age_dic[quants[i]] = float(ages[i])
+        
+        if '岁' not in age_dic:
+            return 'infant'
+        elif age_dic['岁'] < 15:
+            return 'child'
+        else:
+            return 'adult'
 
 
 if __name__ == '__main__':

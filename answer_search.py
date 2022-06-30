@@ -21,16 +21,19 @@ class AnswerSearcher:
     '''执行cypher查询, 并返回相应结果'''
     def search_main(self, sqls, old_ans):
         final_answers = []
+        answers = old_ans
         for sql_ in sqls:
             question_type = sql_['question_type']
             queries = sql_['sql']
             #answers = []
-            answers = old_ans
+            #answers = old_ans
+            if question_type == 'specific_dis':
+                answers = []
             tmps = []
             for query in queries:
                 ress = self.g.run(query).data() #返回列表，元素为字典，key为指定要返回的
                 #answers += ress
-                #TODO: 改为取交集
+                #改为取交集
                 if answers:
                     for ans in answers: #ans为字典
                         for new in ress:
@@ -41,7 +44,7 @@ class AnswerSearcher:
                     tmps = []
                 else:
                     answers = ress
-            return {'question_type':question_type, 'answers':answers}
+            return {'question_type':question_type, 'answers':answers} #TODO: 最后输出不用question_type，直接全输出可能患病及科室
 
             '''final_answer = self.answer_prettify(question_type, answers)
             if final_answer:
@@ -64,7 +67,7 @@ class AnswerSearcher:
             else:
                 ans_all.append({'department':ans['n.name'],'diseases':[{'dis_name':ans['m.name'], 'get_prob':ans['m.get_prob']}]})
                 dep_all.append(ans['n.name'])
-                if len(dep_all) > 2:
+                if len(dep_all) > 5:
                     flag = 1
                     break
         return {'flag':flag, 'ans_all':ans_all}
